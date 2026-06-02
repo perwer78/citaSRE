@@ -1,0 +1,43 @@
+name: TEST Monitor SRE (pruebas 1-2 Jun)
+
+on:
+  schedule:
+    - cron: '30 5 2 6 *'    # 11:30 PM CST 1 Jun  (= 05:30 UTC 2 Jun)
+    - cron: '0 15 2 6 *'    # 9:00 AM CST 2 Jun   (= 15:00 UTC 2 Jun)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Instalar Chromium para Playwright
+        run: python -m playwright install chromium --with-deps
+
+      - name: Correr test (forzar notificación)
+        env:
+          CALLMEBOT_PHONE: ${{ secrets.CALLMEBOT_PHONE }}
+          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+        run: python run_check.py --force
+
+      - name: Guardar snapshot actualizado
+        run: |
+          git config user.name "SRE Monitor Bot"
+          git config user.email "sre-bot@users.noreply.github.com"
+          git add last_snapshot.txt
+          git diff --staged --quiet || git commit -m "chore: update snapshot [skip ci]"
+          git push

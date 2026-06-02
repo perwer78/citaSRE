@@ -6,12 +6,13 @@ CALLMEBOT_URL = "https://api.callmebot.com/whatsapp.php"
 PAGE_URL = "https://portales.sre.gob.mx/tramites-dgaj/obtencion-de-cita-para-iniciar-el-tramite-de-naturalizacion"
 
 
-def build_message(ultima_actualizacion, anuncios):
+def build_message(ultima_actualizacion, anuncios, test_mode=False):
     hora = datetime.now().strftime("%Y-%m-%d %H:%M")
+    encabezado = "🧪 TEST: Bot SRE funcionando" if test_mode else "🚨 ALERTA: Citas Naturalización SRE"
     lines = [
-        "🚨 ALERTA: Citas Naturalización SRE",
-        f"📅 Página actualizada: {ultima_actualizacion}",
-        f"🕐 Detectado: {hora}",
+        encabezado,
+        f"📅 Página dice: {ultima_actualizacion}",
+        f"🕐 Hora: {hora}",
         "",
     ]
     for anuncio in anuncios:

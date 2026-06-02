@@ -1,6 +1,9 @@
 """
 Script de corrida única — usado por GitHub Actions.
-El scheduler lo maneja GitHub, no Python.
+
+Modos:
+  python run_check.py           → producción (solo última semana del mes, solo si hay cambio)
+  python run_check.py --force   → test (siempre corre, siempre notifica)
 """
 
 import os
@@ -14,6 +17,8 @@ from notifier import send_whatsapp, build_message
 
 load_dotenv()
 
+FORCE = "--force" in sys.argv
+
 
 def is_last_week_of_month():
     today = date.today()
@@ -26,9 +31,12 @@ def log(msg):
 
 
 def main():
-    if not is_last_week_of_month():
-        log("Fuera de última semana del mes — sin revisión")
-        return
+    if FORCE:
+        log("=== MODO TEST — forzando notificación ===")
+    else:
+        if not is_last_week_of_month():
+            log("Fuera de última semana del mes — sin revisión")
+            return
 
     log("Revisando página SRE...")
 
@@ -41,16 +49,17 @@ def main():
 
     last_date = load_last_date()
     current_date = info["ultima_actualizacion"]
+    log(f"Fecha en página: {current_date}")
+    log(f"Fecha guardada:  {last_date or '(ninguna)'}")
 
-    if last_date == current_date:
-        log(f"Sin cambios — {current_date}")
+    if not FORCE and last_date == current_date:
+        log("Sin cambios — no se envía notificación")
         return
 
-    log(f"CAMBIO DETECTADO: {current_date} (antes: {last_date})")
-
     anuncios = filter_relevant_announcements(info["anuncios"])
-    message = build_message(current_date, anuncios)
-    log("Mensaje:\n" + message)
+    message = build_message(current_date, anuncios, test_mode=FORCE)
+    log("Enviando WhatsApp...")
+    log(message)
 
     phone = os.getenv("CALLMEBOT_PHONE")
     apikey = os.getenv("CALLMEBOT_APIKEY")
