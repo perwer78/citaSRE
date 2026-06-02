@@ -17,16 +17,24 @@ ANUNCIO_KEYWORDS = [
 ]
 
 
-def fetch_page():
+def fetch_page(debug=False):
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             locale="es-MX",
+            geolocation={"longitude": -99.1332, "latitude": 19.4326},  # Ciudad de México
+            permissions=["geolocation"],
         )
         page = context.new_page()
         page.goto(URL, wait_until="networkidle", timeout=60000)
+        # Espera extra para JS tardío
+        page.wait_for_timeout(3000)
         html = page.content()
+        if debug:
+            print("--- PRIMEROS 2000 CHARS DEL HTML ---")
+            print(html[:2000])
+            print("--- FIN DEBUG ---")
         browser.close()
     return html
 

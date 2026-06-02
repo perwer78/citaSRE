@@ -41,7 +41,7 @@ def main():
     log("Revisando página SRE...")
 
     try:
-        html = fetch_page()
+        html = fetch_page(debug=FORCE)
         info = extract_info(html)
     except Exception as e:
         log(f"Error al descargar página: {e}")
