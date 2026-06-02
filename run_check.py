@@ -51,12 +51,15 @@ def main():
     current_date = info["ultima_actualizacion"]
     log(f"Fecha en página : {current_date}")
     log(f"Fecha guardada  : {last_date or '(ninguna)'}")
+    log(f"Anuncios encontrados: {len(info['anuncios'])}")
+    for a in info["anuncios"]:
+        log(f"  ▶ {a}")
 
     if not FORCE and last_date == current_date:
         log("Sin cambios — no se envía notificación")
         return
 
-    message = build_message(current_date, info["full_text"], test_mode=FORCE)
+    message = build_message(current_date, info["anuncios"], test_mode=FORCE)
     log("Enviando WhatsApp...")
 
     phone = os.getenv("CALLMEBOT_PHONE")

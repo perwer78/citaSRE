@@ -5,6 +5,15 @@ from bs4 import BeautifulSoup
 URL = "https://portales.sre.gob.mx/tramites-dgaj/obtencion-de-cita-para-iniciar-el-tramite-de-naturalizacion"
 SNAPSHOT_FILE = "last_snapshot.txt"
 
+# Colores amarillos que puede usar el gobierno en los estilos CSS
+YELLOW_COLORS = ["yellow", "#ffff00", "#ff0", "rgb(255,255,0)", "rgb(255, 255, 0)"]
+
+# Fallback: si no hay amarillo, buscar por keywords conocidos
+ANUNCIO_KEYWORDS = [
+    "DISPONIBLES EL DÍA", "ESTARÁN DISPONIBLES", "HABILITADAS EN",
+    "MANTENIMIENTO DEL SISTEMA", "INFORMAMOS QUE LAS CITAS",
+]
+
 
 def fetch_page(debug=False):
     with sync_playwright() as p:
@@ -20,36 +29,61 @@ def fetch_page(debug=False):
         page.wait_for_timeout(3000)
         html = page.content()
         if debug:
-            print("--- PRIMEROS 2000 CHARS DEL HTML ---")
-            print(html[:2000])
+            print("--- PRIMEROS 3000 CHARS DEL HTML ---")
+            print(html[:3000])
             print("--- FIN DEBUG ---")
         browser.close()
     return html
 
 
+def _is_yellow(style):
+    s = style.lower().replace(" ", "")
+    return "background" in s and any(c.replace(" ", "") in s for c in YELLOW_COLORS)
+
+
+def extract_highlighted(soup):
+    """Extrae texto de elementos con fondo amarillo, sin duplicados."""
+    seen = set()
+    results = []
+    for tag in soup.find_all(style=True):
+        if _is_yellow(tag.get("style", "")):
+            text = tag.get_text(" ", strip=True)
+            if text and len(text) > 15 and text not in seen:
+                seen.add(text)
+                results.append(text)
+    return results
+
+
+def extract_fallback(soup):
+    """Si no hay amarillo, busca por keywords en <strong> y párrafos."""
+    results = []
+    for tag in soup.find_all(["strong", "p"]):
+        text = tag.get_text(" ", strip=True)
+        if any(kw in text.upper() for kw in ANUNCIO_KEYWORDS) and len(text) > 20:
+            results.append(text)
+    return results
+
+
 def extract_info(html):
     soup = BeautifulSoup(html, "html.parser")
 
-    # Eliminar ruido: scripts, estilos, navegación
-    for tag in soup(["script", "style", "nav", "header", "footer", "meta", "link", "noscript"]):
-        tag.decompose()
-
-    # Extraer TODO el texto visible de la página
-    full_text = soup.get_text(separator="\n", strip=True)
-
-    # Limpiar líneas en blanco múltiples
-    full_text = re.sub(r'\n{3,}', '\n\n', full_text).strip()
-
-    # Detectar la fecha de "Última actualización" (el trigger del bot)
+    # Detectar fecha de "Última actualización"
     ultima_actualizacion = None
-    for line in full_text.split("\n"):
-        if "ltima actualizaci" in line:
-            ultima_actualizacion = line.strip()
+    for text_node in soup.find_all(string=True):
+        if "ltima actualizaci" in text_node:
+            ultima_actualizacion = text_node.strip()
             break
+
+    # Extraer anuncios amarillos
+    anuncios = extract_highlighted(soup)
+
+    # Si no encontró amarillo, usar fallback por keywords
+    if not anuncios:
+        anuncios = extract_fallback(soup)
 
     return {
         "ultima_actualizacion": ultima_actualizacion,
-        "full_text": full_text,
+        "anuncios": anuncios,
     }
 
 
