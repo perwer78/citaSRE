@@ -1,20 +1,9 @@
+import re
 from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 
 URL = "https://portales.sre.gob.mx/tramites-dgaj/obtencion-de-cita-para-iniciar-el-tramite-de-naturalizacion"
 SNAPSHOT_FILE = "last_snapshot.txt"
-
-# Keywords para detectar cualquier anuncio relevante
-KEYWORDS = ["CITAS", "NATURALIZ", "DISPONIBLES", "SINNA", "MANTENIMIENTO", "MES DE", "INFORMAMOS"]
-
-# Keywords que identifican anuncios DINÁMICOS (cambian cada mes)
-# Los demás son texto fijo de la página que nunca cambia
-ANUNCIO_KEYWORDS = [
-    "DISPONIBLES EL DÍA",
-    "ESTARÁN DISPONIBLES",
-    "HABILITADAS EN",
-    "MANTENIMIENTO DEL SISTEMA SINNA",
-]
 
 
 def fetch_page(debug=False):
@@ -23,12 +12,11 @@ def fetch_page(debug=False):
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             locale="es-MX",
-            geolocation={"longitude": -99.1332, "latitude": 19.4326},  # Ciudad de México
+            geolocation={"longitude": -99.1332, "latitude": 19.4326},
             permissions=["geolocation"],
         )
         page = context.new_page()
         page.goto(URL, wait_until="networkidle", timeout=60000)
-        # Espera extra para JS tardío
         page.wait_for_timeout(3000)
         html = page.content()
         if debug:
@@ -42,36 +30,27 @@ def fetch_page(debug=False):
 def extract_info(html):
     soup = BeautifulSoup(html, "html.parser")
 
-    # Buscar "Última actualización"
+    # Eliminar ruido: scripts, estilos, navegación
+    for tag in soup(["script", "style", "nav", "header", "footer", "meta", "link", "noscript"]):
+        tag.decompose()
+
+    # Extraer TODO el texto visible de la página
+    full_text = soup.get_text(separator="\n", strip=True)
+
+    # Limpiar líneas en blanco múltiples
+    full_text = re.sub(r'\n{3,}', '\n\n', full_text).strip()
+
+    # Detectar la fecha de "Última actualización" (el trigger del bot)
     ultima_actualizacion = None
-    for text_node in soup.find_all(string=True):
-        if "ltima actualizaci" in text_node:
-            ultima_actualizacion = text_node.strip()
+    for line in full_text.split("\n"):
+        if "ltima actualizaci" in line:
+            ultima_actualizacion = line.strip()
             break
-
-    # Extraer <strong> con contenido relevante
-    anuncios = []
-    for strong in soup.find_all("strong"):
-        texto = strong.get_text(" ", strip=True)
-        if any(kw in texto.upper() for kw in KEYWORDS) and len(texto) > 20:
-            anuncios.append(texto)
-
-    # Respaldo: párrafos con keywords si no hay <strong>
-    if not anuncios:
-        for p in soup.find_all("p"):
-            texto = p.get_text(" ", strip=True)
-            if any(kw in texto.upper() for kw in KEYWORDS) and len(texto) > 30:
-                anuncios.append(texto)
 
     return {
         "ultima_actualizacion": ultima_actualizacion,
-        "anuncios": anuncios,
+        "full_text": full_text,
     }
-
-
-def filter_relevant_announcements(anuncios):
-    """Filtra solo los anuncios dinámicos (fecha de liberación y avisos especiales)."""
-    return [a for a in anuncios if any(kw in a.upper() for kw in ANUNCIO_KEYWORDS)]
 
 
 def load_last_date():

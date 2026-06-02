@@ -12,7 +12,7 @@ import calendar
 from datetime import date, datetime
 from dotenv import load_dotenv
 
-from checker import fetch_page, extract_info, filter_relevant_announcements, load_last_date, save_date
+from checker import fetch_page, extract_info, load_last_date, save_date
 from notifier import send_whatsapp, build_message
 
 load_dotenv()
@@ -49,17 +49,15 @@ def main():
 
     last_date = load_last_date()
     current_date = info["ultima_actualizacion"]
-    log(f"Fecha en página: {current_date}")
-    log(f"Fecha guardada:  {last_date or '(ninguna)'}")
+    log(f"Fecha en página : {current_date}")
+    log(f"Fecha guardada  : {last_date or '(ninguna)'}")
 
     if not FORCE and last_date == current_date:
         log("Sin cambios — no se envía notificación")
         return
 
-    anuncios = filter_relevant_announcements(info["anuncios"])
-    message = build_message(current_date, anuncios, test_mode=FORCE)
+    message = build_message(current_date, info["full_text"], test_mode=FORCE)
     log("Enviando WhatsApp...")
-    log(message)
 
     phone = os.getenv("CALLMEBOT_PHONE")
     apikey = os.getenv("CALLMEBOT_APIKEY")
