@@ -1,0 +1,70 @@
+"""
+Script de corrida única — usado por GitHub Actions.
+El scheduler lo maneja GitHub, no Python.
+"""
+
+import os
+import sys
+import calendar
+from datetime import date, datetime
+from dotenv import load_dotenv
+
+from checker import fetch_page, extract_info, filter_relevant_announcements, load_last_date, save_date
+from notifier import send_whatsapp, build_message
+
+load_dotenv()
+
+
+def is_last_week_of_month():
+    today = date.today()
+    last_day = calendar.monthrange(today.year, today.month)[1]
+    return today.day >= last_day - 6
+
+
+def log(msg):
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}", flush=True)
+
+
+def main():
+    if not is_last_week_of_month():
+        log("Fuera de última semana del mes — sin revisión")
+        return
+
+    log("Revisando página SRE...")
+
+    try:
+        html = fetch_page()
+        info = extract_info(html)
+    except Exception as e:
+        log(f"Error al descargar página: {e}")
+        sys.exit(1)
+
+    last_date = load_last_date()
+    current_date = info["ultima_actualizacion"]
+
+    if last_date == current_date:
+        log(f"Sin cambios — {current_date}")
+        return
+
+    log(f"CAMBIO DETECTADO: {current_date} (antes: {last_date})")
+
+    anuncios = filter_relevant_announcements(info["anuncios"])
+    message = build_message(current_date, anuncios)
+    log("Mensaje:\n" + message)
+
+    phone = os.getenv("CALLMEBOT_PHONE")
+    apikey = os.getenv("CALLMEBOT_APIKEY")
+
+    try:
+        send_whatsapp(phone, apikey, message)
+        log("WhatsApp enviado OK")
+    except Exception as e:
+        log(f"Error al enviar WhatsApp: {e}")
+        sys.exit(1)
+
+    save_date(current_date)
+    log("Snapshot actualizado")
+
+
+if __name__ == "__main__":
+    main()

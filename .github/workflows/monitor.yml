@@ -1,0 +1,44 @@
+name: Monitor SRE Citas Naturalización
+
+on:
+  schedule:
+    - cron: '0 15 * * *'   # 9:00 AM México (CST = UTC-6)
+    - cron: '0 20 * * *'   # 2:00 PM México
+    - cron: '0 2 * * *'    # 8:00 PM México (02:00 UTC día siguiente)
+  workflow_dispatch:         # permite correrlo manualmente desde GitHub
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Instalar Chromium para Playwright
+        run: python -m playwright install chromium --with-deps
+
+      - name: Correr el monitor
+        env:
+          CALLMEBOT_PHONE: ${{ secrets.CALLMEBOT_PHONE }}
+          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+        run: python run_check.py
+
+      - name: Guardar snapshot actualizado
+        run: |
+          git config user.name "SRE Monitor Bot"
+          git config user.email "sre-bot@users.noreply.github.com"
+          git add last_snapshot.txt
+          git diff --staged --quiet || git commit -m "chore: update snapshot [skip ci]"
+          git push
