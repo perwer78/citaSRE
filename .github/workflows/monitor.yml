@@ -1,11 +1,7 @@
 name: Monitor SRE Citas Naturalización
 
 on:
-  schedule:
-    - cron: '0 15 * * *'   # 9:00 AM México (CST = UTC-6)
-    - cron: '0 20 * * *'   # 2:00 PM México
-    - cron: '0 2 * * *'    # 8:00 PM México (02:00 UTC día siguiente)
-  workflow_dispatch:         # permite correrlo manualmente desde GitHub
+  workflow_dispatch:
 
 permissions:
   contents: write

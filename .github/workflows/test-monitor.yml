@@ -1,9 +1,6 @@
 name: TEST Monitor SRE (pruebas 1-2 Jun)
 
 on:
-  schedule:
-    - cron: '30 5 2 6 *'    # 11:30 PM CST 1 Jun  (= 05:30 UTC 2 Jun)
-    - cron: '0 15 2 6 *'    # 9:00 AM CST 2 Jun   (= 15:00 UTC 2 Jun)
   workflow_dispatch:
 
 permissions:
